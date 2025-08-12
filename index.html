@@ -13,8 +13,9 @@
     header{display:grid;grid-template-columns:1fr auto;gap:12px;align-items:center;margin-bottom:12px}
     .controls{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
     h1{margin:0;font-size:22px}
-    select,input{padding:10px 12px;border-radius:10px;border:1px solid var(--border);outline:none}
-    input:focus,select:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(37,99,235,.15)}
+    select,input,button{padding:10px 12px;border-radius:10px;border:1px solid var(--border);outline:none;background:#fff}
+    input:focus,select:focus,button:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(37,99,235,.15)}
+    button{cursor:pointer}
     .grid{display:grid;gap:16px;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));margin-top:12px}
     article{
       border:1px solid var(--border); border-radius:14px; padding:14px; background:var(--card);
@@ -32,29 +33,45 @@
       font-size:12px
     }
     .empty,.error,.loading{padding:16px;border:1px dashed var(--border);border-radius:12px;color:var(--muted);text-align:center;margin-top:16px}
-    .count{color:var(--muted);font-size:12px;margin-left:4px}
+    .count{color:var(--muted);font-size:12px;margin-left:6px}
+    .morebox{display:flex;justify-content:center;margin-top:14px}
   </style>
 </head>
 <body>
   <header>
-    <h1>Nyheter <span id="total" class="count"></span></h1>
+    <h1>AI-Nyheter <span id="total" class="count"></span></h1>
     <div class="controls">
       <label><span class="sr-only">Kategori</span>
         <select id="filter"></select>
       </label>
       <input id="q" placeholder="Sök i titel/sammanfattning…" />
+      <label>
+        Visa:
+        <select id="pageSize">
+          <option value="12" selected>12</option>
+          <option value="24">24</option>
+          <option value="36">36</option>
+          <option value="48">48</option>
+          <option value="60">60</option>
+        </select>
+      </label>
     </div>
   </header>
 
   <div id="status" class="loading">Hämtar…</div>
   <section class="grid" id="listan" hidden></section>
+  <div class="morebox" id="moreBox" hidden>
+    <button id="loadMore">Ladda 12 till</button>
+  </div>
 
   <script>
-    // ====== 1) Fyll i din Apps Script Web App-URL (slutar på /exec) ======
+    // === 1) Din Apps Script Web App-URL (slutar på /exec) ===
     const API_URL = "https://script.google.com/macros/s/AKfycbzIHwm9EDOj4S16pxDBCBDBuqNEnSHP_0EzT1lq_U-UZPwmTrvZo9s0EcTAnfdJieUP/exec";
-    const LIMIT = 150;
+    // Hämta många i bakgrunden, men styra hur många som visas via dropdown
+    const FETCH_LIMIT = 200;
+    const PAGE_INCREMENT = 12; // knappen lägger till 12 oavsett dropdown-val
 
-    // ====== 2) Välj färger per kategori (lägg till/ändra fritt) ======
+    // === 2) Färger per kategori ===
     const CATEGORY_COLORS = {
       "Digitalisering": "#2563eb",
       "AI": "#7c3aed",
@@ -62,37 +79,43 @@
       "Ekonomi": "#f59e0b",
       "Säkerhet": "#ef4444",
       "Sport": "#16a34a",
-      // Fallback-färg om kategori saknas i mappen:
       "_default": "#64748b"
     };
-    // Intensitet på toning
-    const CARD_TINT_ALPHA = 0.06; // 6% ton på kortet
-    const TAG_BG_ALPHA   = 0.14; // 14% ton på taggens bakgrund
-    const BORDER_ALPHA   = 0.35; // 35% av färgen i kantlinjen
+    const CARD_TINT_ALPHA = 0.06;
+    const TAG_BG_ALPHA   = 0.14;
+    const BORDER_ALPHA   = 0.35;
 
-    // ====== 3) App state ======
+    // === 3) State & elementreferenser ===
     let data = [];
-    const listEl = document.getElementById('listan');
+    let filtered = [];
+    let pageSize = 12;       // från dropdown
+    let visibleCount = 12;   // hur många som just nu visas
+
+    const listEl   = document.getElementById('listan');
     const statusEl = document.getElementById('status');
     const filterEl = document.getElementById('filter');
-    const qEl = document.getElementById('q');
-    const totalEl = document.getElementById('total');
+    const qEl      = document.getElementById('q');
+    const totalEl  = document.getElementById('total');
+    const pageEl   = document.getElementById('pageSize');
+    const moreBox  = document.getElementById('moreBox');
+    const btnMore  = document.getElementById('loadMore');
 
-    // Skärmläsare-hjälpklass
+    // Skärmläsare-klass
     (function(){const s=document.createElement('style');s.textContent='.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0;}';document.head.appendChild(s);})();
 
-    // ====== 4) Datahämtning (fetch -> JSONP fallback) ======
+    // === 4) Ladda data (fetch -> JSONP fallback) ===
     (async function init(){
       try {
-        data = await fetchJson(API_URL + (API_URL.includes('?') ? '&' : '?') + 'limit=' + LIMIT);
+        data = await fetchJson(API_URL + (API_URL.includes('?') ? '&' : '?') + 'limit=' + FETCH_LIMIT);
       } catch (err) {
         console.warn('Fetch misslyckades, försöker JSONP', err);
-        data = await fetchJsonp(API_URL + (API_URL.includes('?') ? '&' : '?') + 'limit=' + LIMIT);
+        data = await fetchJsonp(API_URL + (API_URL.includes('?') ? '&' : '?') + 'limit=' + FETCH_LIMIT);
       }
       buildFilter(data);
-      render();
+      applyFilters(true); // reset visible
       statusEl.remove();
       listEl.hidden = false;
+      moreBox.hidden = false;
     })().catch(err => {
       statusEl.className = 'error';
       statusEl.textContent = 'Kunde inte hämta data. Kolla Web App-inställningarna och URL:en.';
@@ -117,33 +140,39 @@
       });
     }
 
-    // ====== 5) UI ======
+    // === 5) Filter, sök, pagination ===
     function buildFilter(items){
       const cats = Array.from(new Set(items.map(x=>x.kategori).filter(Boolean))).sort();
       filterEl.innerHTML = ['<option value="">Alla kategorier</option>', ...cats.map(c=>`<option>${escapeHtml(c)}</option>`)].join('');
       totalEl.textContent = `(${items.length})`;
     }
 
-    function render(){
+    function applyFilters(resetVisible){
       const term = (qEl.value||'').trim().toLowerCase();
-      const cat = filterEl.value;
-      const items = data
+      const cat  = filterEl.value;
+      filtered = data
         .filter(x=>{
           const text = ((x.titel||'') + ' ' + (x.sammanfattning||'')).toLowerCase();
           const okTerm = !term || text.includes(term);
-          const okCat = !cat || (x.kategori === cat);
+          const okCat  = !cat || (x.kategori === cat);
           return okTerm && okCat;
         })
         .sort((a,b)=> (new Date(b.datum||0)) - (new Date(a.datum||0)));
 
-      // Tom-lista
+      if (resetVisible) visibleCount = pageSize;
+
+      render();
+    }
+
+    function render(){
       listEl.innerHTML = '';
-      if (!items.length){
+      const items = filtered.slice(0, visibleCount);
+
+      if (!filtered.length){
         const box = document.createElement('div');
         box.className='empty';
         box.textContent='Inga artiklar matchar filtret just nu.';
         listEl.before(box);
-        return;
       } else {
         const old = document.querySelector('.empty'); if (old) old.remove();
       }
@@ -190,12 +219,35 @@
         art.appendChild(meta);
         listEl.appendChild(art);
       }
+
+      // Visa/dölj "Ladda fler"
+      if (filtered.length > visibleCount) {
+        btnMore.disabled = false;
+        btnMore.textContent = 'Ladda 12 till';
+      } else {
+        btnMore.disabled = true;
+        btnMore.textContent = 'Inga fler artiklar';
+      }
     }
 
-    filterEl.addEventListener('change', render);
-    qEl.addEventListener('input', render);
+    // Event: ändra filter/sök -> återställ visningsantal
+    filterEl.addEventListener('change', () => applyFilters(true));
+    qEl.addEventListener('input', () => applyFilters(true));
 
-    // ====== 6) Färg-/format-hjälpare ======
+    // Event: ändra dropdown (pageSize) -> uppdatera pageSize & reset visible
+    pageEl.addEventListener('change', () => {
+      pageSize = Number(pageEl.value) || 12;
+      visibleCount = pageSize;
+      render();
+    });
+
+    // Event: Ladda fler (addera 12)
+    btnMore.addEventListener('click', () => {
+      visibleCount = Math.min(visibleCount + PAGE_INCREMENT, filtered.length);
+      render();
+    });
+
+    // === 6) Färg-/format-hjälpare ===
     function pickColorForCategory(cat){
       if (!cat) return CATEGORY_COLORS._default;
       return CATEGORY_COLORS[cat] || CATEGORY_COLORS._default;
@@ -218,12 +270,11 @@
       const rgbaCardBg = rgba(rgb, CARD_TINT_ALPHA);
       const rgbaTagBg  = rgba(rgb, TAG_BG_ALPHA);
       const rgbaBorder = rgba(rgb, BORDER_ALPHA);
-      // Kontrast för tagg-texten: välj mörk/ljus beroende på färgens luminans
       const tagFg = luminance(rgb) > 0.6 ? '#0f172a' : '#0b1220';
       return {rgbaCardBg, rgbaTagBg, rgbaBorder, tagFg};
     }
 
-    // ====== 7) Datum/övrigt ======
+    // === 7) Datum & utils ===
     function parseDate(v){ if(!v) return null; const d=new Date(v); return isNaN(d)?null:d; }
     function formatDateSE(d){ try{ return new Intl.DateTimeFormat('sv-SE',{dateStyle:'short',timeStyle:'short'}).format(d); }catch{ return d.toLocaleString('sv-SE'); } }
     function escapeHtml(s){ return String(s).replace(/[&<>"']/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
