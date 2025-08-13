@@ -35,15 +35,22 @@
     .empty,.error,.loading{padding:16px;border:1px dashed var(--border);border-radius:12px;color:var(--muted);text-align:center;margin-top:16px}
     .count{color:var(--muted);font-size:12px;margin-left:6px}
     .morebox{display:flex;justify-content:center;margin-top:14px}
+    /* Multi-select snyggare bredd/höjd */
+    #filter{min-width:200px}
+    .hint{font-size:12px;color:var(--muted);margin-left:4px}
   </style>
 </head>
 <body>
   <header>
     <h1>Nyheter <span class="count">Totalt antal nyhetsartiklar i arkivet <span id="total"></span></span></h1>
     <div class="controls">
-      <label><span class="sr-only">Kategori</span>
-        <select id="filter"></select>
+      <label>
+        Kategori(er):
+        <select id="filter" multiple></select>
+        <span class="hint">Håll Ctrl/Cmd för flera</span>
       </label>
+      <button id="clearCats" type="button" title="Rensa kategorival">Rensa val</button>
+
       <input id="q" placeholder="Sök i titel/sammanfattning…" />
       <label>
         Visa:
@@ -94,6 +101,7 @@
     const listEl   = document.getElementById('listan');
     const statusEl = document.getElementById('status');
     const filterEl = document.getElementById('filter');
+    const clearCatsBtn = document.getElementById('clearCats');
     const qEl      = document.getElementById('q');
     const totalEl  = document.getElementById('total');
     const pageEl   = document.getElementById('pageSize');
@@ -143,24 +151,30 @@
     // === 5) Filter, sök, pagination ===
     function buildFilter(items){
       const cats = Array.from(new Set(items.map(x=>x.kategori).filter(Boolean))).sort();
-      filterEl.innerHTML = ['<option value="">Alla kategorier</option>', ...cats.map(c=>`<option>${escapeHtml(c)}</option>`)].join('');
+      // skapa bara faktiska kategorier (ingen "Alla"-rad i multi-läge)
+      filterEl.innerHTML = cats.map(c=>`<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
+      // gör listan lagom hög (upp till 8 rader)
+      filterEl.size = Math.min(8, Math.max(2, cats.length));
       totalEl.textContent = `(${items.length})`;
+    }
+
+    function getSelectedCats(){
+      return Array.from(filterEl.selectedOptions).map(o=>o.value).filter(Boolean);
     }
 
     function applyFilters(resetVisible){
       const term = (qEl.value||'').trim().toLowerCase();
-      const cat  = filterEl.value;
+      const selectedCats = getSelectedCats(); // 0 = visa alla
       filtered = data
         .filter(x=>{
           const text = ((x.titel||'') + ' ' + (x.sammanfattning||'')).toLowerCase();
           const okTerm = !term || text.includes(term);
-          const okCat  = !cat || (x.kategori === cat);
+          const okCat  = selectedCats.length === 0 || selectedCats.includes(x.kategori);
           return okTerm && okCat;
         })
         .sort((a,b)=> (new Date(b.datum||0)) - (new Date(a.datum||0)));
 
       if (resetVisible) visibleCount = pageSize;
-
       render();
     }
 
@@ -230,9 +244,15 @@
       }
     }
 
-    // Event: ändra filter/sök -> återställ visningsantal
+    // Event: ändra kategori(er) / sök -> återställ visningsantal
     filterEl.addEventListener('change', () => applyFilters(true));
     qEl.addEventListener('input', () => applyFilters(true));
+
+    // Rensa kategorival
+    clearCatsBtn.addEventListener('click', () => {
+      for (const opt of filterEl.options) opt.selected = false;
+      applyFilters(true);
+    });
 
     // Event: ändra dropdown (pageSize) -> uppdatera pageSize & reset visible
     pageEl.addEventListener('change', () => {
