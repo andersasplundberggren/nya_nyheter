@@ -35,8 +35,25 @@
     .empty,.error,.loading{padding:16px;border:1px dashed var(--border);border-radius:12px;color:var(--muted);text-align:center;margin-top:16px}
     .count{color:var(--muted);font-size:12px;margin-left:6px}
     .morebox{display:flex;justify-content:center;margin-top:14px}
-    /* Multi-select snyggare bredd/höjd */
-    #filter{min-width:200px}
+
+    /* Kategori-chippar (checkboxar) */
+    .chips{display:flex;flex-wrap:wrap;gap:8px;max-width:min(100%,1000px)}
+    .chip{
+      --chip-border: var(--border);
+      --chip-bg: transparent;
+      --chip-bg-checked: #f1f5f9;
+
+      display:inline-flex;align-items:center;gap:8px;
+      border:1px solid var(--chip-border);
+      border-radius:999px;padding:6px 10px;cursor:pointer;user-select:none;
+      background:var(--chip-bg); transition:background .15s ease, box-shadow .15s ease, border-color .15s ease;
+    }
+    .chip.checked{background:var(--chip-bg-checked)}
+    .chip input{appearance:none;width:16px;height:16px;border:1px solid var(--border);border-radius:4px;display:inline-block;position:relative;background:#fff}
+    .chip input:checked{border-color:var(--accent)}
+    .chip input:checked::after{content:"";position:absolute;inset:3px;background:var(--accent);border-radius:2px}
+    .chip span{font-size:14px}
+    .chipsWrap{display:flex;flex-direction:column;gap:6px}
     .hint{font-size:12px;color:var(--muted);margin-left:4px}
   </style>
 </head>
@@ -44,11 +61,12 @@
   <header>
     <h1>Nyheter <span class="count">Totalt antal nyhetsartiklar i arkivet <span id="total"></span></span></h1>
     <div class="controls">
-      <label>
-        Kategori(er):
-        <select id="filter" multiple></select>
-        <span class="hint">Håll Ctrl/Cmd för flera</span>
-      </label>
+      <div class="chipsWrap">
+        <div>
+          <strong>Kategorier:</strong> <span class="hint">Markera flera för att filtrera. Tomt = alla</span>
+        </div>
+        <div id="catChips" class="chips" aria-label="Kategorifilter"></div>
+      </div>
       <button id="clearCats" type="button" title="Rensa kategorival">Rensa val</button>
 
       <input id="q" placeholder="Sök i titel/sammanfattning…" />
@@ -100,7 +118,7 @@
 
     const listEl   = document.getElementById('listan');
     const statusEl = document.getElementById('status');
-    const filterEl = document.getElementById('filter');
+    const chipsEl  = document.getElementById('catChips');
     const clearCatsBtn = document.getElementById('clearCats');
     const qEl      = document.getElementById('q');
     const totalEl  = document.getElementById('total');
@@ -108,7 +126,7 @@
     const moreBox  = document.getElementById('moreBox');
     const btnMore  = document.getElementById('loadMore');
 
-    // Skärmläsare-klass
+    // Skärmläsare-klass för ev. dolda texter (behövs ej just nu)
     (function(){const s=document.createElement('style');s.textContent='.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0;}';document.head.appendChild(s);})();
 
     // === 4) Ladda data (fetch -> JSONP fallback) ===
@@ -119,7 +137,7 @@
         console.warn('Fetch misslyckades, försöker JSONP', err);
         data = await fetchJsonp(API_URL + (API_URL.includes('?') ? '&' : '?') + 'limit=' + FETCH_LIMIT);
       }
-      buildFilter(data);
+      buildCategoryChips(data);
       applyFilters(true); // reset visible
       statusEl.remove();
       listEl.hidden = false;
@@ -148,18 +166,44 @@
       });
     }
 
-    // === 5) Filter, sök, pagination ===
-    function buildFilter(items){
+    // === 5) Kategori-chippar, filter, sök, pagination ===
+    function buildCategoryChips(items){
       const cats = Array.from(new Set(items.map(x=>x.kategori).filter(Boolean))).sort();
-      // skapa bara faktiska kategorier (ingen "Alla"-rad i multi-läge)
-      filterEl.innerHTML = cats.map(c=>`<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
-      // gör listan lagom hög (upp till 8 rader)
-      filterEl.size = Math.min(8, Math.max(2, cats.length));
       totalEl.textContent = `(${items.length})`;
+      chipsEl.innerHTML = '';
+      const frag = document.createDocumentFragment();
+
+      cats.forEach(cat => {
+        const id = 'cat_' + slug(cat);
+        const label = document.createElement('label');
+        label.className = 'chip';
+        label.setAttribute('data-cat', cat);
+
+        // färg per kategori
+        const col = pickColorForCategory(cat);
+        const tints = makeTints(col);
+        label.style.setProperty('--chip-border', tints.rgbaBorder);
+        label.style.setProperty('--chip-bg-checked', tints.rgbaTagBg);
+
+        const input = document.createElement('input');
+        input.type = 'checkbox';
+        input.id = id;
+        input.value = cat;
+        input.className = 'chip-check';
+
+        const span = document.createElement('span');
+        span.textContent = cat;
+
+        label.appendChild(input);
+        label.appendChild(span);
+        frag.appendChild(label);
+      });
+
+      chipsEl.appendChild(frag);
     }
 
     function getSelectedCats(){
-      return Array.from(filterEl.selectedOptions).map(o=>o.value).filter(Boolean);
+      return Array.from(chipsEl.querySelectorAll('.chip-check:checked')).map(i=>i.value);
     }
 
     function applyFilters(resetVisible){
@@ -244,24 +288,31 @@
       }
     }
 
-    // Event: ändra kategori(er) / sök -> återställ visningsantal
-    filterEl.addEventListener('change', () => applyFilters(true));
-    qEl.addEventListener('input', () => applyFilters(true));
+    // Händelser
+    chipsEl.addEventListener('change', (e) => {
+      if (e.target.classList.contains('chip-check')) {
+        const chip = e.target.closest('.chip');
+        chip.classList.toggle('checked', e.target.checked);
+        applyFilters(true);
+      }
+    });
 
-    // Rensa kategorival
     clearCatsBtn.addEventListener('click', () => {
-      for (const opt of filterEl.options) opt.selected = false;
+      chipsEl.querySelectorAll('.chip-check').forEach(i => {
+        i.checked = false;
+        i.closest('.chip').classList.remove('checked');
+      });
       applyFilters(true);
     });
 
-    // Event: ändra dropdown (pageSize) -> uppdatera pageSize & reset visible
+    qEl.addEventListener('input', () => applyFilters(true));
+
     pageEl.addEventListener('change', () => {
       pageSize = Number(pageEl.value) || 12;
       visibleCount = pageSize;
       render();
     });
 
-    // Event: Ladda fler (addera 12)
     btnMore.addEventListener('click', () => {
       visibleCount = Math.min(visibleCount + PAGE_INCREMENT, filtered.length);
       render();
@@ -294,10 +345,10 @@
       return {rgbaCardBg, rgbaTagBg, rgbaBorder, tagFg};
     }
 
-    // === 7) Datum & utils ===
+    // === 7) Utils ===
     function parseDate(v){ if(!v) return null; const d=new Date(v); return isNaN(d)?null:d; }
     function formatDateSE(d){ try{ return new Intl.DateTimeFormat('sv-SE',{dateStyle:'short',timeStyle:'short'}).format(d); }catch{ return d.toLocaleString('sv-SE'); } }
-    function escapeHtml(s){ return String(s).replace(/[&<>"']/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+    function slug(s){ return String(s).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,'-').replace(/(^-|-$)/g,''); }
   </script>
 </body>
 </html>
