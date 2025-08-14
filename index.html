@@ -7,16 +7,77 @@
   <style>
     :root{
       --bg:#fff; --fg:#0b1220; --muted:#52607a; --card:#fff; --border:#e5e7eb; --accent:#2563eb;
+      --layout-gap: 16px;
+      --sidebar-w: 320px; /* bredd på sidomenyn på desktop */
     }
     *{box-sizing:border-box}
-    body{margin:24px;font:16px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;color:var(--fg);background:var(--bg)}
-    header{display:grid;grid-template-columns:1fr auto;gap:12px;align-items:center;margin-bottom:12px}
-    .controls{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
-    h1{margin:0;font-size:22px}
+    body{margin:0;font:16px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;color:var(--fg);background:var(--bg)}
+    a{color:inherit}
+
+    /* Topbar */
+    .topbar{
+      position:sticky; top:0; z-index:20;
+      background:linear-gradient(#fff, #fffcc0 0) 0 0/100% 0 no-repeat, var(--bg);
+      border-bottom:1px solid var(--border);
+      padding:12px 16px; display:flex; align-items:center; gap:12px;
+    }
+    .brand{display:flex; align-items:center; gap:10px}
+    .brand h1{margin:0;font-size:20px}
+    .count{color:var(--muted);font-size:12px;margin-left:6px}
+    .spacer{flex:1}
+    .btn{padding:10px 12px;border-radius:10px;border:1px solid var(--border);background:#fff;cursor:pointer}
+    .btn:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px rgba(37,99,235,.15)}
+    .btn.primary{background:var(--accent); color:#fff; border-color:var(--accent)}
+    .mobileOnly{display:none}
+
+    /* Layout */
+    .wrap{
+      display:grid; gap:var(--layout-gap);
+      grid-template-columns: var(--sidebar-w) 1fr;
+      padding:16px;
+    }
+    aside{
+      border:1px solid var(--border); border-radius:14px; background:var(--card);
+      padding:14px; position:sticky; top:76px; height:fit-content; align-self:start;
+    }
+    main{min-width:0}
+
+    /* Kontroller i sidomenyn */
+    .controls{display:flex;flex-direction:column;gap:12px}
+    .field{display:flex;flex-direction:column;gap:6px}
+    .row{display:flex;gap:8px; align-items:center}
+    label{font-size:14px}
     select,input,button{padding:10px 12px;border-radius:10px;border:1px solid var(--border);outline:none;background:#fff}
     input:focus,select:focus,button:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(37,99,235,.15)}
-    button{cursor:pointer}
-    .grid{display:grid;gap:16px;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));margin-top:12px}
+    .chipsWrap{display:flex;flex-direction:column;gap:6px}
+    .chips{display:flex;flex-wrap:wrap;gap:8px;max-width:100%}
+    .chip{
+      --chip-border: var(--border);
+      --chip-bg: transparent;
+      --chip-bg-checked: #f1f5f9;
+      display:inline-flex;align-items:center;gap:8px;
+      border:1px solid var(--chip-border);
+      border-radius:999px;padding:6px 10px;cursor:pointer;user-select:none;
+      background:var(--chip-bg); transition:background .15s ease, box-shadow .15s ease, border-color .15s ease;
+    }
+    .chip.checked{background:var(--chip-bg-checked)}
+    .chip input{appearance:none;width:16px;height:16px;border:1px solid var(--border);border-radius:4px;display:inline-block;position:relative;background:#fff}
+    .chip input:checked{border-color:var(--accent)}
+    .chip input:checked::after{content:"";position:absolute;inset:3px;background:var(--accent);border-radius:2px}
+    .hint{font-size:12px;color:var(--muted);margin-left:4px}
+
+    /* Prenumerationsruta */
+    .subBox{
+      border-top:1px dashed var(--border); padding-top:12px; margin-top:4px;
+      display:flex; flex-direction:column; gap:8px;
+    }
+    .subBox iframe{
+      width:100%; height:420px; border:1px solid var(--border); border-radius:12px; background:#fff;
+    }
+
+    /* Lista */
+    .status{padding:16px;border:1px dashed var(--border);border-radius:12px;color:var(--muted);text-align:center;margin:16px 0}
+    .grid{display:grid;gap:16px;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));}
     article{
       border:1px solid var(--border); border-radius:14px; padding:14px; background:var(--card);
       display:flex;flex-direction:column;gap:8px; transition:box-shadow .15s ease, transform .15s ease;
@@ -32,71 +93,112 @@
       background:var(--tag-bg,#f1f5f9); color:var(--tag-fg,#0f172a); border:1px solid var(--tag-border,#e5e7eb);
       font-size:12px
     }
-    .empty,.error,.loading{padding:16px;border:1px dashed var(--border);border-radius:12px;color:var(--muted);text-align:center;margin-top:16px}
-    .count{color:var(--muted);font-size:12px;margin-left:6px}
-    .morebox{display:flex;justify-content:center;margin-top:14px}
+    .morebox{display:flex;justify-content:center;margin:18px 0}
+    mark{ background:#fff3a3; padding:0 .15em; border-radius:.2em }
 
-    /* Kategori-chippar (checkboxar) */
-    .chips{display:flex;flex-wrap:wrap;gap:8px;max-width:min(100%,1000px)}
-    .chip{
-      --chip-border: var(--border);
-      --chip-bg: transparent;
-      --chip-bg-checked: #f1f5f9;
-
-      display:inline-flex;align-items:center;gap:8px;
-      border:1px solid var(--chip-border);
-      border-radius:999px;padding:6px 10px;cursor:pointer;user-select:none;
-      background:var(--chip-bg); transition:background .15s ease, box-shadow .15s ease, border-color .15s ease;
+    /* Responsivitet */
+    @media (max-width: 1000px){
+      :root{ --sidebar-w: 300px }
     }
-    .chip.checked{background:var(--chip-bg-checked)}
-    .chip input{appearance:none;width:16px;height:16px;border:1px solid var(--border);border-radius:4px;display:inline-block;position:relative;background:#fff}
-    .chip input:checked{border-color:var(--accent)}
-    .chip input:checked::after{content:"";position:absolute;inset:3px;background:var(--accent);border-radius:2px}
-    .chip span{font-size:14px}
-    .chipsWrap{display:flex;flex-direction:column;gap:6px}
-    .hint{font-size:12px;color:var(--muted);margin-left:4px}
+    @media (max-width: 860px){
+      .wrap{grid-template-columns: 1fr}
+      aside{position:static}
+      .mobileOnly{display:unset}
+    }
   </style>
 </head>
 <body>
-  <header>
-    <h1>Nyheter <span class="count">Totalt antal nyhetsartiklar i arkivet <span id="total"></span></span></h1>
-    <div class="controls">
-      <div class="chipsWrap">
-        <div>
-          <strong>Kategorier:</strong> <span class="hint">Markera flera för att filtrera. Tomt = alla</span>
-        </div>
-        <div id="catChips" class="chips" aria-label="Kategorifilter"></div>
-      </div>
-      <button id="clearCats" type="button" title="Rensa kategorival">Rensa val</button>
-
-      <input id="q" placeholder="Sök i titel/sammanfattning…" />
-      <label>
-        Visa:
-        <select id="pageSize">
-          <option value="12" selected>12</option>
-          <option value="24">24</option>
-          <option value="36">36</option>
-          <option value="48">48</option>
-          <option value="60">60</option>
-        </select>
-      </label>
+  <!-- Topbar -->
+  <div class="topbar">
+    <div class="brand">
+      <h1>Nyheter <span class="count">Visar <span id="shown">0</span> av <span id="total">0</span></span></h1>
     </div>
-  </header>
+    <div class="spacer"></div>
+    <button id="toggleSidebar" class="btn mobileOnly" type="button" aria-expanded="false" aria-controls="sidebar">Filter & prenumeration</button>
+  </div>
 
-  <div id="status" class="loading">Hämtar…</div>
-  <section class="grid" id="listan" hidden></section>
-  <div class="morebox" id="moreBox" hidden>
-    <button id="loadMore">Ladda 12 till</button>
+  <!-- Layout -->
+  <div class="wrap">
+    <!-- Sticky sidomeny -->
+    <aside id="sidebar" hidden>
+      <div class="controls" role="region" aria-label="Filter och alternativ">
+        <div class="field">
+          <label for="q">Sök</label>
+          <input id="q" placeholder="Sök i titel/sammanfattning…" />
+        </div>
+
+        <div class="row" style="gap:12px">
+          <label class="field" style="flex:1">
+            <span>Sortera</span>
+            <select id="sortBy" title="Sorteringsordning">
+              <option value="newest" selected>Nyast först</option>
+              <option value="oldest">Äldst först</option>
+              <option value="az">A–Ö (titel)</option>
+            </select>
+          </label>
+          <label class="field" style="width:120px">
+            <span>Visa</span>
+            <select id="pageSize">
+              <option value="12" selected>12</option>
+              <option value="24">24</option>
+              <option value="36">36</option>
+              <option value="48">48</option>
+              <option value="60">60</option>
+            </select>
+          </label>
+        </div>
+
+        <div class="row" style="gap:12px">
+          <label class="field" style="flex:1;min-width:0">
+            <span>Från datum</span>
+            <input id="fromDate" type="date" />
+          </label>
+          <label class="field" style="flex:1;min-width:0">
+            <span>Till datum</span>
+            <input id="toDate" type="date" />
+          </label>
+        </div>
+
+        <div class="chipsWrap">
+          <div><strong>Kategorier</strong> <span class="hint">Markera flera för att filtrera. Tomt = alla</span></div>
+          <div id="catChips" class="chips" aria-label="Kategorifilter"></div>
+          <div class="row" style="justify-content:space-between">
+            <button id="clearCats" class="btn" type="button" title="Rensa kategorival">Rensa kategorier</button>
+            <button id="resetAll" class="btn" type="button" title="Återställ alla filter">Återställ allt</button>
+          </div>
+        </div>
+
+        <div class="subBox">
+          <div class="row" style="justify-content:space-between; align-items:center">
+            <strong>Prenumerera via e-post</strong>
+            <a class="hint" href="https://script.google.com/macros/s/AKfycbyfKBMmxsdBJurQLUwYMmdenTKFVX5j-3qMfCvC4VxtqYdLR_tZk-ojCo-M3SaJl1k6/exec?subscribe=1" target="_blank" rel="noopener">Öppna i ny flik</a>
+          </div>
+          <iframe
+            src="https://script.google.com/macros/s/AKfycbyfKBMmxsdBJurQLUwYMmdenTKFVX5j-3qMfCvC4VxtqYdLR_tZk-ojCo-M3SaJl1k6/exec?subscribe=1"
+            title="Prenumerationsformulär"
+            loading="lazy"
+          ></iframe>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Innehåll -->
+    <main>
+      <div id="status" class="status">Hämtar…</div>
+      <section class="grid" id="listan" hidden></section>
+      <div class="morebox" id="moreBox" hidden>
+        <button id="loadMore" class="btn">Ladda 12 till</button>
+      </div>
+    </main>
   </div>
 
   <script>
-    // === 1) Din Apps Script Web App-URL (slutar på /exec) ===
+    // === 1) Konfiguration ===
+    // Din Apps Script Web App-URL (slutar på /exec)
     const API_URL = "https://script.google.com/macros/s/AKfycbzIHwm9EDOj4S16pxDBCBDBuqNEnSHP_0EzT1lq_U-UZPwmTrvZo9s0EcTAnfdJieUP/exec";
-    // Hämta många i bakgrunden, men styra hur många som visas via dropdown
     const FETCH_LIMIT = 200;
-    const PAGE_INCREMENT = 12; // knappen lägger till 12 oavsett dropdown-val
 
-    // === 2) Färger per kategori ===
+    // Färger per kategori
     const CATEGORY_COLORS = {
       "Digitalisering": "#2563eb",
       "AI": "#7c3aed",
@@ -110,44 +212,59 @@
     const TAG_BG_ALPHA   = 0.14;
     const BORDER_ALPHA   = 0.35;
 
-    // === 3) State & elementreferenser ===
+    // === 2) State & elementreferenser ===
     let data = [];
     let filtered = [];
     let pageSize = 12;       // från dropdown
     let visibleCount = 12;   // hur många som just nu visas
 
-    const listEl   = document.getElementById('listan');
-    const statusEl = document.getElementById('status');
-    const chipsEl  = document.getElementById('catChips');
+    const listEl     = document.getElementById('listan');
+    const statusEl   = document.getElementById('status');
+    const chipsEl    = document.getElementById('catChips');
     const clearCatsBtn = document.getElementById('clearCats');
-    const qEl      = document.getElementById('q');
-    const totalEl  = document.getElementById('total');
-    const pageEl   = document.getElementById('pageSize');
-    const moreBox  = document.getElementById('moreBox');
-    const btnMore  = document.getElementById('loadMore');
+    const resetAllBtn  = document.getElementById('resetAll');
+    const qEl        = document.getElementById('q');
+    const totalEl    = document.getElementById('total');
+    const shownEl    = document.getElementById('shown');
+    const pageEl     = document.getElementById('pageSize');
+    const sortEl     = document.getElementById('sortBy');
+    const fromEl     = document.getElementById('fromDate');
+    const toEl       = document.getElementById('toDate');
+    const moreBox    = document.getElementById('moreBox');
+    const btnMore    = document.getElementById('loadMore');
+    const sidebar    = document.getElementById('sidebar');
+    const toggleBtn  = document.getElementById('toggleSidebar');
 
     // Skärmläsare-klass för ev. dolda texter (behövs ej just nu)
     (function(){const s=document.createElement('style');s.textContent='.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0;}';document.head.appendChild(s);})();
 
-    // === 4) Ladda data (fetch -> JSONP fallback) ===
+    // === 3) Init ===
     (async function init(){
       try {
+        // visa sidomeny som default på desktop (CSS gömmer på mobil)
+        if (window.matchMedia('(min-width: 861px)').matches) sidebar.hidden = false;
+
         data = await fetchJson(API_URL + (API_URL.includes('?') ? '&' : '?') + 'limit=' + FETCH_LIMIT);
       } catch (err) {
         console.warn('Fetch misslyckades, försöker JSONP', err);
         data = await fetchJsonp(API_URL + (API_URL.includes('?') ? '&' : '?') + 'limit=' + FETCH_LIMIT);
       }
       buildCategoryChips(data);
+      totalEl.textContent = String(data.length);
+
+      readUrlState(); // förifyll från URL
       applyFilters(true); // reset visible
+
       statusEl.remove();
       listEl.hidden = false;
       moreBox.hidden = false;
     })().catch(err => {
-      statusEl.className = 'error';
+      statusEl.className = 'status';
       statusEl.textContent = 'Kunde inte hämta data. Kolla Web App-inställningarna och URL:en.';
       console.error(err);
     });
 
+    // === 4) Datahämtning ===
     async function fetchJson(url){
       const r = await fetch(url);
       if (!r.ok) throw new Error('HTTP ' + r.status);
@@ -166,10 +283,16 @@
       });
     }
 
-    // === 5) Kategori-chippar, filter, sök, pagination ===
+    // === 5) UI: Sidomeny på mobil ===
+    toggleBtn.addEventListener('click', () => {
+      const isHidden = sidebar.hidden;
+      sidebar.hidden = !isHidden;
+      toggleBtn.setAttribute('aria-expanded', String(!isHidden));
+    });
+
+    // === 6) Kategori-chippar, filter, sök, pagination ===
     function buildCategoryChips(items){
       const cats = Array.from(new Set(items.map(x=>x.kategori).filter(Boolean))).sort();
-      totalEl.textContent = `(${items.length})`;
       chipsEl.innerHTML = '';
       const frag = document.createDocumentFragment();
 
@@ -209,16 +332,42 @@
     function applyFilters(resetVisible){
       const term = (qEl.value||'').trim().toLowerCase();
       const selectedCats = getSelectedCats(); // 0 = visa alla
+
+      // datumintervall
+      const from = fromEl.value ? new Date(fromEl.value) : null;
+      const to   = toEl.value   ? new Date(toEl.value)   : null;
+      if (to) { to.setHours(23,59,59,999); }
+
       filtered = data
         .filter(x=>{
           const text = ((x.titel||'') + ' ' + (x.sammanfattning||'')).toLowerCase();
           const okTerm = !term || text.includes(term);
           const okCat  = selectedCats.length === 0 || selectedCats.includes(x.kategori);
-          return okTerm && okCat;
-        })
-        .sort((a,b)=> (new Date(b.datum||0)) - (new Date(a.datum||0)));
+
+          const d = parseDate(x.datum);
+          const okFrom = !from || (d && d >= from);
+          const okTo   = !to   || (d && d <= to);
+
+          return okTerm && okCat && okFrom && okTo;
+        });
+
+      // sortering
+      const sortBy = (sortEl.value || 'newest');
+      filtered.sort((a,b)=>{
+        if (sortBy === 'oldest') {
+          return (new Date(a.datum||0)) - (new Date(b.datum||0));
+        } else if (sortBy === 'az') {
+          return String(a.titel||'').localeCompare(String(b.titel||''), 'sv');
+        } else { // newest
+          return (new Date(b.datum||0)) - (new Date(a.datum||0));
+        }
+      });
 
       if (resetVisible) visibleCount = pageSize;
+
+      // spara state i URL
+      writeUrlState();
+
       render();
     }
 
@@ -226,13 +375,18 @@
       listEl.innerHTML = '';
       const items = filtered.slice(0, visibleCount);
 
+      // räknare i topbar
+      shownEl.textContent = String(items.length);
+      totalEl.textContent = String(filtered.length || data.length);
+
       if (!filtered.length){
+        // ingen träff
         const box = document.createElement('div');
-        box.className='empty';
+        box.className='status';
         box.textContent='Inga artiklar matchar filtret just nu.';
         listEl.before(box);
       } else {
-        const old = document.querySelector('.empty'); if (old) old.remove();
+        const old = document.querySelector('.status'); if (old) old.remove();
       }
 
       for (const x of items){
@@ -246,12 +400,12 @@
         const h3 = document.createElement('h3');
         const a = document.createElement('a');
         a.href = x.länk || '#'; a.target = '_blank'; a.rel='noopener';
-        a.textContent = x.titel || '(saknar titel)';
+        a.innerHTML = highlight(x.titel || '(saknar titel)', (qEl.value||'').trim());
         h3.appendChild(a);
 
         const p = document.createElement('p');
         p.className='summary';
-        p.textContent = (x.sammanfattning || '').trim();
+        p.innerHTML = highlight((x.sammanfattning || '').trim(), (qEl.value||'').trim());
 
         const meta = document.createElement('div');
         meta.className='meta';
@@ -281,7 +435,7 @@
       // Visa/dölj "Ladda fler"
       if (filtered.length > visibleCount) {
         btnMore.disabled = false;
-        btnMore.textContent = 'Ladda 12 till';
+        btnMore.textContent = `Ladda ${pageSize} till`;
       } else {
         btnMore.disabled = true;
         btnMore.textContent = 'Inga fler artiklar';
@@ -305,6 +459,22 @@
       applyFilters(true);
     });
 
+    resetAllBtn.addEventListener('click', () => {
+      // Rensa allt
+      qEl.value = '';
+      fromEl.value = '';
+      toEl.value = '';
+      sortEl.value = 'newest';
+      pageEl.value = '12';
+      pageSize = 12;
+      visibleCount = 12;
+      chipsEl.querySelectorAll('.chip-check').forEach(i => {
+        i.checked = false;
+        i.closest('.chip').classList.remove('checked');
+      });
+      applyFilters(true);
+    });
+
     qEl.addEventListener('input', () => applyFilters(true));
 
     pageEl.addEventListener('change', () => {
@@ -314,11 +484,16 @@
     });
 
     btnMore.addEventListener('click', () => {
-      visibleCount = Math.min(visibleCount + PAGE_INCREMENT, filtered.length);
+      const increment = pageSize; // dynamiskt
+      visibleCount = Math.min(visibleCount + increment, filtered.length);
       render();
     });
 
-    // === 6) Färg-/format-hjälpare ===
+    sortEl.addEventListener('change', () => applyFilters(true));
+    fromEl.addEventListener('change', () => applyFilters(true));
+    toEl.addEventListener('change', () => applyFilters(true));
+
+    // === 7) Färg-/format-hjälpare ===
     function pickColorForCategory(cat){
       if (!cat) return CATEGORY_COLORS._default;
       return CATEGORY_COLORS[cat] || CATEGORY_COLORS._default;
@@ -345,10 +520,68 @@
       return {rgbaCardBg, rgbaTagBg, rgbaBorder, tagFg};
     }
 
-    // === 7) Utils ===
+    // === 8) Highlight & utils ===
+    function highlight(text, term){
+      if (!term) return escapeHtml(text||'');
+      const safe = escapeHtml(text||'');
+      const re = new RegExp('(' + term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')', 'gi');
+      return safe.replace(re, '<mark>$1</mark>');
+    }
+    function escapeHtml(s){
+      return String(s)
+        .replaceAll('&','&amp;')
+        .replaceAll('<','&lt;')
+        .replaceAll('>','&gt;')
+        .replaceAll('"','&quot;')
+        .replaceAll("'",'&#39;');
+    }
+
     function parseDate(v){ if(!v) return null; const d=new Date(v); return isNaN(d)?null:d; }
     function formatDateSE(d){ try{ return new Intl.DateTimeFormat('sv-SE',{dateStyle:'short',timeStyle:'short'}).format(d); }catch{ return d.toLocaleString('sv-SE'); } }
     function slug(s){ return String(s).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,'-').replace(/(^-|-$)/g,''); }
+
+    // === 9) URL-state ===
+    function writeUrlState(){
+      const params = new URLSearchParams();
+      if (qEl.value) params.set('q', qEl.value);
+      const cats = getSelectedCats();
+      if (cats.length) params.set('cats', cats.join(','));
+      if (sortEl.value && sortEl.value !== 'newest') params.set('sort', sortEl.value);
+      if (fromEl.value) params.set('from', fromEl.value);
+      if (toEl.value) params.set('to', toEl.value);
+      if (String(pageSize) !== '12') params.set('page', String(pageSize));
+      history.replaceState(null, '', (location.pathname + (params.toString()? '?' + params.toString() : '')));
+    }
+
+    function readUrlState(){
+      const p = new URLSearchParams(location.search);
+      const q   = p.get('q') || '';
+      const cats= (p.get('cats') || '').split(',').filter(Boolean);
+      const sort= p.get('sort') || 'newest';
+      const from= p.get('from') || '';
+      const to  = p.get('to')   || '';
+      const pg  = Number(p.get('page') || 12);
+
+      qEl.value = q;
+      if (['newest','oldest','az'].includes(sort)) sortEl.value = sort;
+      if (from) fromEl.value = from;
+      if (to)   toEl.value   = to;
+
+      if (Number.isFinite(pg) && [12,24,36,48,60].includes(pg)) {
+        pageEl.value = String(pg);
+        pageSize = pg;
+        visibleCount = pg;
+      }
+
+      if (cats.length) {
+        // chippar kan vara tomma om detta körs innan buildCategoryChips
+        chipsEl.querySelectorAll('.chip-check').forEach(i=>{
+          const checked = cats.includes(i.value);
+          i.checked = checked;
+          i.closest('.chip').classList.toggle('checked', checked);
+        });
+      }
+    }
   </script>
 </body>
 </html>
